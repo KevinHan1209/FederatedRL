@@ -59,7 +59,7 @@ class FEDSVRPG_M():
 
         # Calculate gradient estimates of each policy
         lp_grads = [th.autograd.grad(outputs=pi, inputs=self.local_policy.parameters(), grad_outputs=th.ones_like(pi)) for pi in local_log_probs]
-        gp_grads = grad_list = [th.autograd.grad(outputs=pi, inputs=self.global_policy.parameters(), grad_outputs=th.ones_like(pi)) for pi in global_log_probs]
+        gp_grads = [th.autograd.grad(outputs=pi, inputs=self.global_policy.parameters(), grad_outputs=th.ones_like(pi)) for pi in global_log_probs]
         g_curr_policy = multiply_and_sum_tensors(scalar_tensor=local_returns, tensor_lists=lp_grads)
         g_global_policy = multiply_and_sum_tensors(scalar_tensor=global_returns, tensor_lists=gp_grads)
 
