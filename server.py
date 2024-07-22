@@ -72,7 +72,7 @@ class Federated_RL():
 
 
     def generate_models(self):
-        for _, (name, env, gamma) in enumerate(zip(self.agent_names, self.envs, self.discount_factors)):
+        for agent, (name, env, gamma) in enumerate(zip(self.agent_names, self.envs, self.discount_factors)):
             model_instance = FEDSVRPG_M(
                 policy=self.policy,
                 env=env,

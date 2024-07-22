@@ -47,9 +47,9 @@ class FEDSVRPG_M():
             'log_probs', 'probs', 'returns', 'actions', 'states', 'rewards', 'dones')
 
         save_data_to_file(global_log_probs, global_probs, global_returns, global_actions, 
-                          global_states, global_rewards, global_dones, "global data")
+                          global_states, global_rewards, global_dones, "global_data", self.iteration)
         save_data_to_file(local_log_probs, local_probs, local_returns, local_actions, 
-                          local_states, local_rewards, local_dones, "local_data")
+                          local_states, local_rewards, local_dones, "local_data", self.iteration)
 
         # Calculate importance sampling weight
         glp_total, llp_total = sum(global_log_probs), sum(local_log_probs)
@@ -76,11 +76,11 @@ class FEDSVRPG_M():
             list2=multiply_tensors_in_place(momentum_term, scalar=1 - self.beta)
         )
 
+        clip_gradients(u)
 
+        print("Step size: " + str(eta_t))
         with th.no_grad():
             for param, grad in zip(self.local_policy.parameters(), u):
-                if th.isnan(grad).any() or th.isinf(grad).any():
-                    print("NaN or Inf found in gradients:", grad)
                 param.data.add_(eta_t * grad)
 
             # Optionally apply weight decay
@@ -140,16 +140,16 @@ class FEDSVRPG_M():
     def learn(
     self,
     ):
-        iteration = 0
+        self.iteration = 0
         self.delta = []
 
         # Run through local iterations
-        while iteration < self.K:
+        while self.iteration < self.K:
             
             # Get trajectory from global policy
             print("GLOBAL ITERATION: " + str(self.global_iter_num))
             print("TRAINING AGENT: " + self.agent_name)
-            print("LOCAL ITERATION: " + str(iteration), end='\n\n')
+            print("LOCAL ITERATION: " + str(self.iteration), end='\n\n')
             print("Acquiring global rollout")
             self.sample_trajectory(self.global_rollout_buffer, policy = self.global_policy, display = True)
             print()
@@ -158,7 +158,7 @@ class FEDSVRPG_M():
             self.sample_trajectory(self.local_rollout_buffer, policy = self.local_policy, display = True)
             print()
 
-            iteration += 1
+            self.iteration += 1
 
             # Update local policy
             self.train()

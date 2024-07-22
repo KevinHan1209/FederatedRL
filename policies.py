@@ -44,7 +44,4 @@ class GaussianMLPPolicy(nn.Module):
         if len(action.shape) != len(mu.shape):
             raise ValueError("Action and mean have different number of dimensions.")
 
-        # Sum over the appropriate dimensions for log probability
-        log_prob = log_prob.sum(dim=list(range(1, len(action.shape))))
-
         return log_prob

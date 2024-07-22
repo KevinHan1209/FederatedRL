@@ -1,5 +1,6 @@
 import torch as th
 import numpy as np
+import os
 from typing import List, Any
 
 def multiply_elements(input_list, scalar):
@@ -186,7 +187,7 @@ def compare_policies(policy1, policy2):
 
     return True
 
-def save_data_to_file(log_probs, probs, returns, actions, states, rewards, dones, filename_prefix):
+def save_data_to_file(log_probs, probs, returns, actions, states, rewards, dones, folder_name, iteration):
     # Convert tensors to numpy arrays with .detach() to avoid gradients
     if isinstance(log_probs[0], th.Tensor):
         log_probs_np = [lp.detach().numpy() for lp in log_probs]
@@ -210,15 +211,15 @@ def save_data_to_file(log_probs, probs, returns, actions, states, rewards, dones
     else:
         actions_np = [np.array(a) for a in actions]
 
-     # Convert tensors to numpy arrays with .detach() to avoid gradients
+    # Convert tensors to numpy arrays with .detach() to avoid gradients
     if isinstance(states[0], th.Tensor):
         states_np = [s.detach().numpy() for s in states]
     else:
         states_np = [np.array(s) for s in states]
     
-    # Ensure returns is always a tensor or a numpy array
+    # Ensure rewards is always a tensor or a numpy array
     if isinstance(rewards, th.Tensor):
-        rewards_np = returns.detach().numpy()
+        rewards_np = rewards.detach().numpy()
     else:
         rewards_np = np.array(rewards)
 
@@ -227,24 +228,31 @@ def save_data_to_file(log_probs, probs, returns, actions, states, rewards, dones
         dones_np = dones.detach().numpy()
     else:
         dones_np = np.array(dones)
-        
+
+    # Create the directory if it doesn't exist
+    dir_path = os.path.join(folder_name, f"iteration_{iteration}")
+    os.makedirs(dir_path, exist_ok=True)
+    
     # Save log probabilities to CSV
-    np.savetxt(f"{filename_prefix}_log_probs.csv", np.vstack(log_probs_np), delimiter=',', fmt='%f')
+    np.savetxt(os.path.join(dir_path, "log_probs.csv"), np.vstack(log_probs_np), delimiter=',', fmt='%f')
 
     # Save probabilities to CSV
-    np.savetxt(f"{filename_prefix}_probs.csv", np.vstack(probs_np), delimiter=',', fmt='%f')
+    np.savetxt(os.path.join(dir_path, "probs.csv"), np.vstack(probs_np), delimiter=',', fmt='%f')
 
     # Save returns to CSV
-    np.savetxt(f"{filename_prefix}_returns.csv", returns_np, delimiter=',', fmt='%f')
+    np.savetxt(os.path.join(dir_path, "returns.csv"), returns_np, delimiter=',', fmt='%f')
 
     # Save actions to CSV
-    np.savetxt(f"{filename_prefix}_actions.csv", np.vstack(actions_np), delimiter=',', fmt='%f')
+    np.savetxt(os.path.join(dir_path, "actions.csv"), np.vstack(actions_np), delimiter=',', fmt='%f')
 
     # Save states to CSV
-    np.savetxt(f"{filename_prefix}_states.csv", np.vstack(states_np), delimiter=',', fmt='%f')
+    np.savetxt(os.path.join(dir_path, "states.csv"), np.vstack(states_np), delimiter=',', fmt='%f')
+
+    # Save rewards to CSV
+    np.savetxt(os.path.join(dir_path, "rewards.csv"), rewards_np, delimiter=',', fmt='%f')
 
     # Save dones to CSV
-    np.savetxt(f"{filename_prefix}_dones.csv", dones_np, delimiter=',', fmt='%f')
+    np.savetxt(os.path.join(dir_path, "dones.csv"), dones_np, delimiter=',', fmt='%f')
 
     
 
@@ -261,9 +269,17 @@ def compute_gradient_norms(gradients):
 def clip_log_probs(log_probs, min_value=-100, max_value=0):
     return [lp.clamp(min_value, max_value) for lp in log_probs]
 
-def clip_gradients(grads, max_norm):
-    for grad_list in grads:
-        th.nn.utils.clip_grad_norm_(grad_list, max_norm)
+def clip_gradients(grads, max_norm=0.5):
+    total_norm = 0.0
+    for grad in grads:
+        param_norm = grad.data.norm(2)
+        total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+
+    clip_coef = max_norm / (total_norm + 1e-6)
+    if clip_coef < 1:
+        for grad in grads:
+            grad.data.mul_(clip_coef)
 
 def save_statistics(means, stds, file_name='means_and_stds.txt'):
     with open(file_name, 'w') as file:
