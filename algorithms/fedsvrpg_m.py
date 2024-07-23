@@ -172,5 +172,8 @@ class FEDSVRPG_M():
             self.delta.append(param1 - param2)
 
         return self
+    
+    def get_model(self):
+        return self.local_policy
             
 

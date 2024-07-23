@@ -290,3 +290,193 @@ def save_statistics(means, stds, file_name='means_and_stds.txt'):
         for std in stds:
             file.write(f"{std}\n")
 
+
+def PPO_policy_update(PPO_Model, policy_net_update, value_net_update):
+    '''
+    Sample shape:
+    log_std: torch.Size([1])
+    mlp_extractor.policy_net.0.weight: torch.Size([512, 27])
+    mlp_extractor.policy_net.0.bias: torch.Size([512])
+    mlp_extractor.policy_net.2.weight: torch.Size([512, 512])
+    mlp_extractor.policy_net.2.bias: torch.Size([512])
+    mlp_extractor.policy_net.4.weight: torch.Size([256, 512])
+    mlp_extractor.policy_net.4.bias: torch.Size([256])
+    mlp_extractor.policy_net.6.weight: torch.Size([128, 256])
+    mlp_extractor.policy_net.6.bias: torch.Size([128])
+    mlp_extractor.value_net.0.weight: torch.Size([32, 27])
+    mlp_extractor.value_net.0.bias: torch.Size([32])
+    mlp_extractor.value_net.2.weight: torch.Size([32, 32])
+    mlp_extractor.value_net.2.bias: torch.Size([32])
+    action_net.weight: torch.Size([1, 128])
+    action_net.bias: torch.Size([1])
+    value_net.weight: torch.Size([1, 32])
+    value_net.bias: torch.Size([1])
+    '''
+    policy_params = []
+    value_params = []
+    holder = PPO_Model.get_parameters()
+    orig_params = holder['policy']
+    for i in orig_params:
+        if 'mlp' and 'policy' in i or 'action' in i:
+            policy_params.append(orig_params[i])
+        if 'value' in i:
+            value_params.append(orig_params[i])
+    new_policy = [pp + ppu for pp, ppu in zip(policy_params, policy_net_update)]
+    new_value = [vp + vpu for vp, vpu in zip(value_params, value_net_update)]
+    for pp, npp in zip([param for param in orig_params if ('mlp' in param and 'policy' in param) or 'action' in param], new_policy):
+        orig_params[pp] = npp
+    for vp, nvp in zip([param for param in orig_params if 'value' in param], new_value):
+        orig_params[vp] = nvp
+    holder['policy'] = orig_params
+    return holder
+
+def TD3_policy_update(TD3_Model, policy_net_update, value_net_update):
+    '''
+    Sample shape:
+    actor.mu.0.weight: torch.Size([512, 27])
+    actor.mu.0.bias: torch.Size([512])
+    actor.mu.2.weight: torch.Size([512, 512])
+    actor.mu.2.bias: torch.Size([512])
+    actor.mu.4.weight: torch.Size([256, 512])
+    actor.mu.4.bias: torch.Size([256])
+    actor.mu.6.weight: torch.Size([128, 256])
+    actor.mu.6.bias: torch.Size([128])
+    actor.mu.8.weight: torch.Size([1, 128])
+    actor.mu.8.bias: torch.Size([1])
+    actor_target.mu.0.weight: torch.Size([512, 27])
+    actor_target.mu.0.bias: torch.Size([512])
+    actor_target.mu.2.weight: torch.Size([512, 512])
+    actor_target.mu.2.bias: torch.Size([512])
+    actor_target.mu.4.weight: torch.Size([256, 512])
+    actor_target.mu.4.bias: torch.Size([256])
+    actor_target.mu.6.weight: torch.Size([128, 256])
+    actor_target.mu.6.bias: torch.Size([128])
+    actor_target.mu.8.weight: torch.Size([1, 128])
+    actor_target.mu.8.bias: torch.Size([1])
+    critic.qf0.0.weight: torch.Size([32, 28])
+    critic.qf0.0.bias: torch.Size([32])
+    critic.qf0.2.weight: torch.Size([32, 32])
+    critic.qf0.2.bias: torch.Size([32])
+    critic.qf0.4.weight: torch.Size([1, 32])
+    critic.qf0.4.bias: torch.Size([1])
+    critic.qf1.0.weight: torch.Size([32, 28])
+    critic.qf1.0.bias: torch.Size([32])
+    critic.qf1.2.weight: torch.Size([32, 32])
+    critic.qf1.2.bias: torch.Size([32])
+    critic.qf1.4.weight: torch.Size([1, 32])
+    critic.qf1.4.bias: torch.Size([1])
+    critic_target.qf0.0.weight: torch.Size([32, 28])
+    critic_target.qf0.0.bias: torch.Size([32])
+    critic_target.qf0.2.weight: torch.Size([32, 32])
+    critic_target.qf0.2.bias: torch.Size([32])
+    critic_target.qf0.4.weight: torch.Size([1, 32])
+    critic_target.qf0.4.bias: torch.Size([1])
+    critic_target.qf1.0.weight: torch.Size([32, 28])
+    critic_target.qf1.0.bias: torch.Size([32])
+    critic_target.qf1.2.weight: torch.Size([32, 32])
+    critic_target.qf1.2.bias: torch.Size([32])
+    critic_target.qf1.4.weight: torch.Size([1, 32])
+    critic_target.qf1.4.bias: torch.Size([1])
+    '''
+    policy_params = []
+    value_params = []
+    policy_targets = []
+    value_targets = []
+    holder = TD3_Model.get_parameters()
+    orig_params = holder['policy']
+    for i in orig_params:
+        if 'actor.mu' in i:
+            policy_params.append(orig_params[i])
+        if 'critic.qf' in i:
+            value_params.append(orig_params[i])
+        if 'actor_target' in i:
+            policy_targets.append(orig_params[i])
+        if 'critic_target' in i:
+            value_targets.append(orig_params[i])
+    new_policy = [pp + ppu for pp, ppu in zip(policy_params, policy_net_update)]
+    new_value = [vp + vpu for vp, vpu in zip(value_params, value_net_update)]
+    for pp, pt, npp in zip([param for param in orig_params if 'actor.mu' in param], 
+                           [param for param in orig_params if 'actor_target' in param], new_policy):
+        orig_params[pp] = npp
+        orig_params[pt] = npp
+    for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
+                       [param for param in orig_params if 'critic_target' in param], new_value):
+        orig_params[vp] = nvp
+        orig_params[vt] = nvp
+    holder['policy'] = orig_params
+    return holder
+
+def SAC_policy_update(TD3_Model, policy_net_update, value_net_update):
+    '''
+    Sample shape:
+    actor.latent_pi.0.weight: torch.Size([512, 27])
+    actor.latent_pi.0.bias: torch.Size([512])
+    actor.latent_pi.2.weight: torch.Size([512, 512])
+    actor.latent_pi.2.bias: torch.Size([512])
+    actor.latent_pi.4.weight: torch.Size([256, 512])
+    actor.latent_pi.4.bias: torch.Size([256])
+    actor.latent_pi.6.weight: torch.Size([128, 256])
+    actor.latent_pi.6.bias: torch.Size([128])
+    actor.mu.weight: torch.Size([1, 128])
+    actor.mu.bias: torch.Size([1])
+    actor.log_std.weight: torch.Size([1, 128])
+    actor.log_std.bias: torch.Size([1])
+    critic.qf0.0.weight: torch.Size([32, 28])
+    critic.qf0.0.bias: torch.Size([32])
+    critic.qf0.2.weight: torch.Size([32, 32])
+    critic.qf0.2.bias: torch.Size([32])
+    critic.qf0.4.weight: torch.Size([1, 32])
+    critic.qf0.4.bias: torch.Size([1])
+    critic.qf1.0.weight: torch.Size([32, 28])
+    critic.qf1.0.bias: torch.Size([32])
+    critic.qf1.2.weight: torch.Size([32, 32])
+    critic.qf1.2.bias: torch.Size([32])
+    critic.qf1.4.weight: torch.Size([1, 32])
+    critic.qf1.4.bias: torch.Size([1])
+    critic_target.qf0.0.weight: torch.Size([32, 28])
+    critic_target.qf0.0.bias: torch.Size([32])
+    critic_target.qf0.2.weight: torch.Size([32, 32])
+    critic_target.qf0.2.bias: torch.Size([32])
+    critic_target.qf0.4.weight: torch.Size([1, 32])
+    critic_target.qf0.4.bias: torch.Size([1])
+    critic_target.qf1.0.weight: torch.Size([32, 28])
+    critic_target.qf1.0.bias: torch.Size([32])
+    critic_target.qf1.2.weight: torch.Size([32, 32])
+    critic_target.qf1.2.bias: torch.Size([32])
+    critic_target.qf1.4.weight: torch.Size([1, 32])
+    critic_target.qf1.4.bias: torch.Size([1])
+    '''
+    policy_params = []
+    value_params = []
+    value_targets = []
+    holder = TD3_Model.get_parameters()
+    orig_params = holder['policy']
+    for i in orig_params:
+        if 'actor' in i:
+            policy_params.append(orig_params[i])
+        if 'critic.qf' in i:
+            value_params.append(orig_params[i])
+        if 'critic_target' in i:
+            value_targets.append(orig_params[i])
+    new_policy = [pp + ppu for pp, ppu in zip(policy_params, policy_net_update)]
+    new_value = [vp + vpu for vp, vpu in zip(value_params, value_net_update)]
+    for pp, npp in zip([param for param in orig_params if 'actor' in param and 'std' not in param], new_policy):
+        orig_params[pp] = npp
+    for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
+                       [param for param in orig_params if 'critic_target' in param], new_value):
+        orig_params[vp] = nvp
+        orig_params[vt] = nvp
+    holder['policy'] = orig_params
+    return holder
+        
+def get_ActorCritic_delta(global_policy, global_value, curr_policy, curr_value):
+    policy_delta = [cp - gp for cp, gp in zip(curr_policy, global_policy)]
+    value_delta = [cv - gv for cv, gv in zip(curr_value, global_value)]
+    return policy_delta, value_delta
+
+
+
+
+
+
+
