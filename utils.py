@@ -35,8 +35,9 @@ def multiply_tensors_in_place(tensors, scalar):
     Returns:
     - list of torch.Tensor: List of tensors after multiplication.
     """
-    for tensor in tensors:
-        tensor.mul_(scalar)  # In-place multiplication
+    with th.no_grad():
+        for tensor in tensors:
+            tensor.mul_(scalar)  # In-place multiplication
 
     return tensors
 
@@ -72,9 +73,9 @@ def add_lists_of_tensors(list1, list2):
     - list of torch.Tensor: List of tensors after addition.
     """
     assert len(list1) == len(list2), "Lists must have the same length"
-
-    for t1, t2 in zip(list1, list2):
-        t1.add_(t2)  # In-place addition
+    with th.no_grad():
+        for t1, t2 in zip(list1, list2):
+            t1.add_(t2)  # In-place addition
 
     return list1
 
@@ -91,8 +92,9 @@ def subtract_lists_of_tensors(list1, list2):
     """
     assert len(list1) == len(list2), "Lists must have the same length"
 
-    for t1, t2 in zip(list1, list2):
-        t1.sub_(t2)  # In-place subtraction
+    with th.no_grad():
+        for t1, t2 in zip(list1, list2):
+            t1.sub_(t2)  # In-place subtraction
 
     return list1
 
@@ -144,7 +146,7 @@ def check_shapes(input_list):
     
     return check_shape_recursive(input_list, first_shape)
     
-def sum_gradients(nested_list):
+def sum_tensorLists(nested_list):
     if not nested_list or not nested_list[0]:
         raise ValueError("The input list is empty or improperly structured")
     
@@ -317,12 +319,13 @@ def PPO_policy_update(PPO_Model, policy_net_update, value_net_update):
     holder = PPO_Model.get_parameters()
     orig_params = holder['policy']
     for i in orig_params:
-        if 'mlp' and 'policy' in i or 'action' in i:
+        if 'mlp' in i and 'policy' in i or 'action' in i:
             policy_params.append(orig_params[i])
         if 'value' in i:
             value_params.append(orig_params[i])
-    new_policy = [pp + ppu for pp, ppu in zip(policy_params, policy_net_update)]
-    new_value = [vp + vpu for vp, vpu in zip(value_params, value_net_update)]
+    # Directly assign the new parameters to replace the old ones
+    new_policy = policy_net_update
+    new_value = value_net_update
     for pp, npp in zip([param for param in orig_params if ('mlp' in param and 'policy' in param) or 'action' in param], new_policy):
         orig_params[pp] = npp
     for vp, nvp in zip([param for param in orig_params if 'value' in param], new_value):
@@ -393,14 +396,15 @@ def TD3_policy_update(TD3_Model, policy_net_update, value_net_update):
             policy_targets.append(orig_params[i])
         if 'critic_target' in i:
             value_targets.append(orig_params[i])
-    new_policy = [pp + ppu for pp, ppu in zip(policy_params, policy_net_update)]
-    new_value = [vp + vpu for vp, vpu in zip(value_params, value_net_update)]
-    for pp, pt, npp in zip([param for param in orig_params if 'actor.mu' in param], 
+    # Directly assign the new parameters to replace the old ones
+    new_policy = policy_net_update
+    new_value = value_net_update
+    for pp, pt, npp in zip([param for param in orig_params if 'actor.mu' in param],
                            [param for param in orig_params if 'actor_target' in param], new_policy):
         orig_params[pp] = npp
         orig_params[pt] = npp
     for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
-                       [param for param in orig_params if 'critic_target' in param], new_value):
+                           [param for param in orig_params if 'critic_target' in param], new_value):
         orig_params[vp] = nvp
         orig_params[vt] = nvp
     holder['policy'] = orig_params
@@ -458,8 +462,8 @@ def SAC_policy_update(TD3_Model, policy_net_update, value_net_update):
             value_params.append(orig_params[i])
         if 'critic_target' in i:
             value_targets.append(orig_params[i])
-    new_policy = [pp + ppu for pp, ppu in zip(policy_params, policy_net_update)]
-    new_value = [vp + vpu for vp, vpu in zip(value_params, value_net_update)]
+    new_policy = policy_net_update
+    new_value = value_net_update
     for pp, npp in zip([param for param in orig_params if 'actor' in param and 'std' not in param], new_policy):
         orig_params[pp] = npp
     for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
@@ -474,9 +478,23 @@ def get_ActorCritic_delta(global_policy, global_value, curr_policy, curr_value):
     value_delta = [cv - gv for cv, gv in zip(curr_value, global_value)]
     return policy_delta, value_delta
 
+def replace_torch_parameters(model, new_params, start_index=2):
+    # Get current parameters as a list
+    policy = model.get_model()
+    current_params = list(policy.parameters())
+    
+    # Replace parameters from start_index with new_params
+    for i, new_param in enumerate(new_params):
+        if start_index + i < len(current_params):
+            current_params[start_index + i].data.copy_(new_param)
+        else:
+            raise IndexError("The new_params list is longer than the remaining parameters to be updated.")
+    
+    # Set the updated parameters back to the module
+    for param, new_param in zip(policy.parameters(), current_params):
+        param.data.copy_(new_param)
 
-
-
+    return policy
 
 
 
