@@ -293,7 +293,7 @@ def save_statistics(means, stds, file_name='means_and_stds.txt'):
             file.write(f"{std}\n")
 
 
-def PPO_policy_update(PPO_Model, policy_net_update, value_net_update):
+def PPO_policy_update(PPO_Model, policy_net_update, value_net_update, critic_net_update):
     '''
     Sample shape:
     log_std: torch.Size([1])
@@ -328,12 +328,13 @@ def PPO_policy_update(PPO_Model, policy_net_update, value_net_update):
     new_value = value_net_update
     for pp, npp in zip([param for param in orig_params if ('mlp' in param and 'policy' in param) or 'action' in param], new_policy):
         orig_params[pp] = npp
-    for vp, nvp in zip([param for param in orig_params if 'value' in param], new_value):
-        orig_params[vp] = nvp
+    if critic_net_update:
+        for vp, nvp in zip([param for param in orig_params if 'value' in param], new_value):
+            orig_params[vp] = nvp
     holder['policy'] = orig_params
     return holder
 
-def TD3_policy_update(TD3_Model, policy_net_update, value_net_update):
+def TD3_policy_update(TD3_Model, policy_net_update, value_net_update, critic_net_update):
     '''
     Sample shape:
     actor.mu.0.weight: torch.Size([512, 27])
@@ -403,14 +404,15 @@ def TD3_policy_update(TD3_Model, policy_net_update, value_net_update):
                            [param for param in orig_params if 'actor_target' in param], new_policy):
         orig_params[pp] = npp
         orig_params[pt] = npp
-    for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
-                           [param for param in orig_params if 'critic_target' in param], new_value):
-        orig_params[vp] = nvp
-        orig_params[vt] = nvp
+    if critic_net_update:
+        for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
+                            [param for param in orig_params if 'critic_target' in param], new_value):
+            orig_params[vp] = nvp
+            orig_params[vt] = nvp
     holder['policy'] = orig_params
     return holder
 
-def SAC_policy_update(TD3_Model, policy_net_update, value_net_update):
+def SAC_policy_update(TD3_Model, policy_net_update, value_net_update, critic_net_update):
     '''
     Sample shape:
     actor.latent_pi.0.weight: torch.Size([512, 27])
@@ -466,10 +468,11 @@ def SAC_policy_update(TD3_Model, policy_net_update, value_net_update):
     new_value = value_net_update
     for pp, npp in zip([param for param in orig_params if 'actor' in param and 'std' not in param], new_policy):
         orig_params[pp] = npp
-    for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
-                       [param for param in orig_params if 'critic_target' in param], new_value):
-        orig_params[vp] = nvp
-        orig_params[vt] = nvp
+    if critic_net_update:
+        for vp, vt, nvp in zip([param for param in orig_params if 'critic.qf' in param],
+                        [param for param in orig_params if 'critic_target' in param], new_value):
+            orig_params[vp] = nvp
+            orig_params[vt] = nvp
     holder['policy'] = orig_params
     return holder
         

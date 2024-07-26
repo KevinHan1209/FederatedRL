@@ -59,11 +59,12 @@ class FEDSVRPG_M():
         local_log_probs, local_probs, local_returns, local_actions, local_states, local_rewards, local_dones = self.local_rollout_buffer.get(
             'log_probs', 'probs', 'returns', 'actions', 'states', 'rewards', 'dones')
         
-        
+        '''
         save_data_to_file(global_log_probs, global_probs, global_returns, global_actions, 
                           global_states, global_rewards, global_dones, "global_data", self.iteration)
         save_data_to_file(local_log_probs, local_probs, local_returns, local_actions, 
                           local_states, local_rewards, local_dones, "local_data", self.iteration)
+        '''
         
         # Calculate importance sampling weight
         glp_total, llp_total = sum(global_log_probs), sum(local_log_probs)

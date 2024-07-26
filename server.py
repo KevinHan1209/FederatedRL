@@ -49,9 +49,9 @@ class Federated_RL():
         # Preprocess input policy module
         self.policy_params = [param for name, param in policy.named_parameters()][2:]
         # Preprocess value net
-        if critic_net_aggregation:
-            init_value_net = ValueFunctionNetwork(input_size=state_size, output_size=1, layer_sizes=critic_net)
+        init_value_net = ValueFunctionNetwork(input_size=state_size, output_size=1, layer_sizes=critic_net)
         self.value_params = [param for name, param in init_value_net.named_parameters()]
+
 
         self.envs = envs
         self.env_kwargs = env_kwargs
@@ -216,13 +216,13 @@ class Federated_RL():
         policy_total_rewards, value_total_rewards, action_total_rewards = 0, 0, 0
         # Get total amount of agents which use each respective parameters
         self.total_policy_agents = sum(1 for x in self.policy_deltas if x != 0)
-        self.total_critic_agents = sum(1 for x in self.value_deltas if x != 0)
+        self.total_critic_agents = sum(1 for x in self.value_deltas if x != 0) if self.critic_net_aggregation else 0
         # Calculate gradients
         for dp, dv, da, weight in zip(self.policy_deltas, self.value_deltas, self.action_weights, self.policy_rewards):
             if dp != 0:
                 policy_grad = add_lists_of_tensors(policy_grad, multiply_tensors_in_place(dp, weight))
                 policy_total_rewards += weight
-            if dv != 0:
+            if dv != 0 and self.critic_net_aggregation:
                 value_grad = add_lists_of_tensors(value_grad, multiply_tensors_in_place(dv, weight))
                 value_total_rewards += weight
             if type(da) != int:
@@ -238,7 +238,8 @@ class Federated_RL():
 
         # Perform the gradient update
         self.policy_params = [param + self.global_step_size * grad for param, grad in zip(self.policy_params, self.policy_grad)]
-        self.value_params = [param + self.global_step_size * grad for param, grad in zip(self.value_params, value_grad)]
+        if self.critic_net_aggregation:
+            self.value_params = [param + self.global_step_size * grad for param, grad in zip(self.value_params, value_grad)]
 
         self.update_models()
 
@@ -344,18 +345,18 @@ class Federated_RL():
                 model.update_attributes(self.policy_grad, self.iter_num, new_policy, new_policy)
             elif classification == "SB3":
                 if algo == "PPO":
-                    new_params = PPO_policy_update(model, self.policy_params, self.value_params)
+                    new_params = PPO_policy_update(model, self.policy_params, self.value_params, self.critic_net_aggregation)
                     model.set_parameters(new_params)
                 if algo == "SAC":
                     # Re-attach action tensor to first critic parameter
                     reconstructed_first_tensor = th.cat((self.value_params[0], self.action_update), dim=1)
                     new_critic_params = [param if i != 0 else reconstructed_first_tensor for i, param in enumerate(self.value_params)]
-                    new_params = SAC_policy_update(model, self.policy_params, new_critic_params)
+                    new_params = SAC_policy_update(model, self.policy_params, new_critic_params, self.critic_net_aggregation)
                     model.set_parameters(new_params)
                 if algo == "TD3":
                     reconstructed_first_tensor = th.cat((self.value_params[0], self.action_update), dim=1)
                     new_critic_params = [param if i != 0 else reconstructed_first_tensor for i, param in enumerate(self.value_params)]
-                    new_params = TD3_policy_update(model, self.policy_params, new_critic_params)
+                    new_params = TD3_policy_update(model, self.policy_params, new_critic_params, self.critic_net_aggregation)
                     model.set_parameters(new_params)
 
             
