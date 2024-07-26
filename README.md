@@ -1,4 +1,4 @@
-# Federated and Ensembled Reinforcement Learning
+# Federated and Ensembled Reinforcement Learning on Micro UAVs
 Completed as part of my summer REU at Columbia University under the supervision of Dr. Brian Plancher. Serves as a universal platform for ensembled federated deep reinforcement
 learning with many options for customization. 
 ## Note:
